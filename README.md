@@ -1,21 +1,51 @@
-# ReportKit Codex Skill
+# ReportKit Codex Skills
 
-Public Codex skill for using ReportKit from agents and automation.
+Public Codex skills for setting up and running ReportKit Live Activity automations.
 
-This repository contains only skill guidance:
+This repo contains two skills:
 
-- `reportkit/SKILL.md`
-- `reportkit/agents/openai.yaml`
+- `$reportkit-setup`: use when a person asks an agent to set up an automation that should send ReportKit Live Activity updates.
+- `$reportkit-execution`: use inside the automation when the agent has evaluated state and needs to send or skip the ReportKit update.
 
-It intentionally does not include the ReportKit CLI source, iOS app source, Supabase migrations, Edge Functions, SQL, deployment config, user sessions, or agent tokens.
+The split matters: setup is conversational and designs the report contract; execution is narrow, secret-safe, and sends with `reportkit send --file payload.json`.
+
+## Live Activity Examples
+
+Use this skill when you want an agent to send focused, action-oriented Live Activity updates instead of another chat notification.
+
+| Ops Calm | Release Readiness | Mixpanel Funnel |
+| --- | --- | --- |
+| ![Ops Calm](assets/live-activity-previews/live-activity-ops-calm.png) | ![Release Readiness](assets/live-activity-previews/live-activity-release-readiness.png) | ![Mixpanel Funnel](assets/live-activity-previews/live-activity-mixpanel-funnel.png) |
+
+| App Store Analytics | Supabase Errors | GCloud Incident |
+| --- | --- | --- |
+| ![App Store Analytics](assets/live-activity-previews/live-activity-app-store-analytics.png) | ![Supabase Errors](assets/live-activity-previews/live-activity-supabase-errors.png) | ![GCloud Incident](assets/live-activity-previews/live-activity-gcloud-incident.png) |
+
+| Codex Agent Progress | Builder Launch Console | Builder Compact Console |
+| --- | --- | --- |
+| ![Codex Agent Progress](assets/live-activity-previews/live-activity-codex-agent-progress.png) | ![Builder Launch Console](assets/live-activity-previews/live-activity-builder-launch-console.png) | ![Builder Compact Console](assets/live-activity-previews/live-activity-builder-compact-console.png) |
 
 ## Install
 
-Copy or symlink the `reportkit` folder into your Codex skills directory:
+Ask your agent to install this skill repo, for example:
 
-```bash
-mkdir -p ~/.codex/skills
-cp -R reportkit ~/.codex/skills/reportkit
+```text
+Install https://github.com/AndreasInk/ReportKit-Skill.git so I can set up ReportKit Live Activity automations.
+Use $reportkit-setup when we are designing or installing an automation.
+Use $reportkit-execution inside the automation when it is time to send or skip.
 ```
 
-Then invoke it as `$reportkit` when asking Codex to draft ReportKit payloads, commands, or setup steps.
+Then start with `$reportkit-setup` when asking Codex to configure a report, monitor, schedule, CI check, or agent workflow.
+
+Inside an automation prompt, include `$reportkit-execution` so the runtime agent uses the stricter send/skip rules.
+
+## Repo Contents
+
+- `reportkit-setup/SKILL.md`
+- `reportkit-execution/SKILL.md`
+- `assets/live-activity-previews/`
+
+## More Info
+
+Read the docs here: 
+https://andreas.craft.me/qtX8oWJYSSxbJ2
