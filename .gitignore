@@ -1,0 +1,12 @@
+.DS_Store
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+session-store.json
+config.json
+*.log
+payload.local.json
+*agent-token*
+*.private.*

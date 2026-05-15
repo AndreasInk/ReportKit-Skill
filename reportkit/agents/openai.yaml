@@ -1,0 +1,4 @@
+interface:
+  display_name: "ReportKit"
+  short_description: "Send ReportKit Live Activity updates"
+  default_prompt: "Use $reportkit to draft a ReportKit Live Activity payload and command for a project status update."
