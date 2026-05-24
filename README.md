@@ -1,13 +1,20 @@
 # ReportKit Codex Skills
 
-Public Codex skills for setting up and running ReportKit Live Activity automations.
+Public Codex skills for setting up and running ReportKit automations.
 
 This repo contains two skills:
 
-- `$reportkit-setup`: use when a person asks an agent to set up an automation that should send ReportKit Live Activity updates.
+- `$reportkit-setup`: use when a person asks an agent to set up an automation that should send ReportKit updates.
 - `$reportkit-execution`: use inside the automation when the agent has evaluated state and needs to send or skip the ReportKit update.
 
 The split matters: setup is conversational and designs the report contract; execution is narrow, secret-safe, and sends with `reportkit send --file payload.json`.
+
+ReportKit sends can target multiple iPhone surfaces:
+
+- `live_activity`: Dynamic Island / Lock Screen Live Activity updates.
+- `widget`: Home Screen / Lock Screen WidgetKit refresh snapshots.
+- `notification`: grouped APNs alert notifications with `notification.threadId`.
+- Control Widget state updates through `notification.control`.
 
 ## Live Activity Examples
 
@@ -30,7 +37,7 @@ Use this skill when you want an agent to send focused, action-oriented Live Acti
 Ask your agent to install this skill repo, for example:
 
 ```text
-Install https://github.com/AndreasInk/ReportKit-Skill.git so I can set up ReportKit Live Activity automations.
+Install https://github.com/AndreasInk/ReportKit-Skill.git so I can set up ReportKit automations.
 Use $reportkit-setup when we are designing or installing an automation.
 Use $reportkit-execution inside the automation when it is time to send or skip.
 ```

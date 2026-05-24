@@ -1,6 +1,6 @@
 ---
 name: reportkit-setup
-description: Set up a user-facing automation that sends ReportKit iPhone Live Activity updates. Use when the user asks an agent to configure a report, monitor, schedule, CI job, Codex/Cursor/Claude automation, or other workflow that should publish concise ReportKit status updates.
+description: Set up a user-facing automation that sends ReportKit iPhone Live Activity updates, Home/Lock widget refreshes, grouped push notifications, or Control Widget state updates. Use when the user asks an agent to configure a report, monitor, schedule, CI job, Codex/Cursor/Claude automation, or other workflow that should publish concise ReportKit status updates.
 ---
 
 # ReportKit Setup
@@ -17,7 +17,10 @@ Create an automation that knows:
 - when it should send
 - when it should stay silent
 - how to map outcomes to `good`, `warning`, and `critical`
-- which Live Activity template to use
+- which ReportKit surfaces to send: `live_activity`, `widget`, `notification`
+- which Live Activity template to use when `live_activity` is included
+- how notifications should group, using `notification.threadId`
+- whether notifications should also update the Control Widget state
 - where the action or deep link should open
 - how the runtime agent will access `REPORTKIT_AGENT_TOKEN`
 
@@ -72,8 +75,11 @@ Ask only what is needed, then produce concrete setup instructions.
 6. When should the automation do nothing?
 7. Are there quiet hours, blackout windows, or people/projects to exclude?
 8. Should each report use a separate `activityId`, or should multiple checks group into one Live Activity?
-9. What should the action text say?
-10. What URL, app deep link, Craft doc, PR, dashboard, or run log should open?
+9. Which surfaces should this send to: Live Activity, Home/Lock widget, grouped notification, or Control Widget?
+10. If notifications are enabled, what stable `threadId` should group them in Notification Center?
+11. If the Control Widget is enabled, which states turn it on and which clear it?
+12. What should the action text say?
+13. What URL, app deep link, Craft doc, PR, dashboard, or run log should open?
 
 ## Template Choice
 
@@ -89,6 +95,33 @@ For visual setup tests, use a filled payload with `template`, `sourceName`, `sou
 `accentHex` or `accent_hex` may control the Live Activity accent color and lock-screen mesh when present.
 
 For `builder`, use file mode and include `builderSpec` plus `data` directly in the payload. The widget does not fetch layouts at render time.
+
+## Surfaces
+
+Omit `surfaces` only for the legacy Live Activity-only default. For new automations, use `reportkit send --file payload.json` with explicit surfaces:
+
+- `live_activity`: Dynamic Island / Lock Screen Live Activity update.
+- `widget`: Home Screen / Lock Screen WidgetKit refresh through a silent push. Include `widget.widgetId`, a small non-secret `widget.snapshot`, and `reload: true`.
+- `notification`: visible APNs alert. Include `notification.threadId` so related alerts group in Notification Center.
+
+Control Widget state is carried on the notification payload:
+
+```json
+{
+  "notification": {
+    "title": "Release Watch",
+    "body": "Issue resolved.",
+    "threadId": "release-watch",
+    "control": {
+      "isOn": false,
+      "statusText": "Clear",
+      "triageURL": "https://example.com/run"
+    }
+  }
+}
+```
+
+Use `control.isOn: true` for active warning/critical states and `false` for clear/resolved states. Treat the push payload as the Control Widget source of truth; do not require manual Control Center taps to correct automation state.
 
 ## Handoff To Runtime
 
@@ -108,6 +141,15 @@ When this automation finishes evaluating the current state, use $reportkit-execu
 If the skip condition is true, do not send.
 If sending, create a ReportKit JSON payload with activityId "release-watch",
 template "agent", status from the rules above, and a stable idempotencyKey for this run.
+Run reportkit send --file payload.json. Do not print REPORTKIT_AGENT_TOKEN.
+```
+
+Multi-surface runtime instruction shape:
+
+```text
+When this automation finishes evaluating the current state, use $reportkit-execution.
+If the skip condition is true, do not send.
+If sending, create a ReportKit JSON payload with surfaces ["live_activity", "widget", "notification"], activityId "release-watch", template "agent", status from the rules above, widget.widgetId "release-watch", notification.threadId "release-watch", and notification.control.isOn set true for warning/critical and false for resolved.
 Run reportkit send --file payload.json. Do not print REPORTKIT_AGENT_TOKEN.
 ```
 

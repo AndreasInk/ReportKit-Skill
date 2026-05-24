@@ -1,4 +1,4 @@
 interface:
   display_name: "ReportKit Setup"
-  short_description: "Set up automations that send ReportKit Live Activities"
-  default_prompt: "Use $reportkit-setup to design a ReportKit Live Activity automation and hand off safe runtime send instructions."
+  short_description: "Set up automations that send ReportKit updates"
+  default_prompt: "Use $reportkit-setup to design a ReportKit automation for Live Activity, widget, notification, or control surfaces and hand off safe runtime send instructions."
