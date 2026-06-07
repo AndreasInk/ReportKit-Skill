@@ -1,6 +1,6 @@
-# ReportKit Codex Skills
+# ReportKit Agent Skills
 
-Public Codex skills for setting up and running ReportKit automations.
+Public agent skills for setting up and running ReportKit automations.
 
 This repo contains two skills:
 
