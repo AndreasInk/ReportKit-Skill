@@ -65,8 +65,8 @@ Inside an automation prompt, include `$reportkit-execution` so the runtime agent
 Read the docs here: 
 https://andreas.craft.me/qtX8oWJYSSxbJ2
 
-or join the iOS TestFlight here:
+Join the iOS TestFlight here:
 https://testflight.apple.com/join/KCr6Sxgn
 
-see releases for the latest macOS build:
+Download the latest macOS release here:
 https://github.com/AndreasInk/ReportKit-Skill/releases/tag/beta
