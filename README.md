@@ -7,7 +7,15 @@ This repo contains two skills:
 - `$reportkit-setup`: use when a person asks an agent to set up an automation that should send ReportKit updates.
 - `$reportkit-execution`: use inside the automation when the agent has evaluated state and needs to send or skip the ReportKit update.
 
-The split matters: setup is conversational and designs the report contract; execution is narrow, secret-safe, and sends with `reportkit send --file payload.json`.
+The split matters: setup is conversational and designs the report contract; execution is narrow, secret-safe, and sends with the local `reportkit_send` MCP helper or the hosted CLI fallback `reportkit send --file payload.json`.
+
+For local Codex, Claude, Cursor, and other MCP-compatible AI apps, ReportKit setup now prefers the macOS app:
+
+1. Sign into the ReportKit iPhone and macOS apps with the same account.
+2. In the macOS app, enable MCP and copy the config.
+3. Let the runtime agent call `reportkit_send` with the ReportKit JSON payload.
+
+Hosted/cloud agents that cannot use the local macOS MCP helper should use a revocable `REPORTKIT_AGENT_TOKEN` secret and the CLI fallback.
 
 ReportKit sends can target multiple iPhone surfaces:
 
@@ -42,7 +50,7 @@ Use $reportkit-setup when we are designing or installing an automation.
 Use $reportkit-execution inside the automation when it is time to send or skip.
 ```
 
-Then start with `$reportkit-setup` when asking Codex to configure a report, monitor, schedule, CI check, or agent workflow.
+Then start with `$reportkit-setup` when asking Codex to configure a report, monitor, schedule, CI check, or agent workflow. For local AI apps, have the ReportKit macOS app installed and MCP enabled first.
 
 Inside an automation prompt, include `$reportkit-execution` so the runtime agent uses the stricter send/skip rules.
 

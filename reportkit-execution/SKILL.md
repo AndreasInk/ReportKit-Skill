@@ -7,24 +7,33 @@ description: Execute a ReportKit send from inside an existing automation. Use wh
 
 Use this skill at runtime, inside an automation. The setup and policy decisions should already exist.
 
-Do not redesign the automation here. Do not ask broad onboarding questions unless required data is missing. Decide whether to skip, write a safe payload, and run `reportkit send --file payload.json`.
+Do not redesign the automation here. Do not ask broad onboarding questions unless required data is missing. Decide whether to skip, create a safe payload, and publish through the local `reportkit_send` MCP tool or the hosted CLI fallback.
 
 ## Runtime Rules
 
 1. Read the automation's existing instructions and current state.
 2. If the skip condition is true, do not send.
-3. If sending, use a JSON payload file.
-4. Keep `deepLink`, `apnsEnv`, and `idempotencyKey` inside JSON.
-5. Do not print, echo, or inline `REPORTKIT_AGENT_TOKEN`.
-6. Do not run `REPORTKIT_AGENT_TOKEN=... reportkit ...`.
-7. Do not put passwords or Supabase keys into commands.
-8. Do not install, auth, or create tokens unless the automation explicitly says setup is allowed.
+3. If sending locally and `reportkit_send` is available, call that MCP tool with the JSON payload.
+4. If sending from hosted/cloud/CI without MCP, use a JSON payload file and `reportkit send --file payload.json`.
+5. Keep `deepLink`, `apnsEnv`, and `idempotencyKey` inside JSON.
+6. Do not print, echo, or inline `REPORTKIT_AGENT_TOKEN`.
+7. Do not run `REPORTKIT_AGENT_TOKEN=... reportkit ...`.
+8. Do not put passwords or Supabase keys into commands.
+9. Do not install, auth, or create tokens unless the automation explicitly says setup is allowed.
 
-In hosted agents, `REPORTKIT_AGENT_TOKEN` should already be available through the secret environment. Local trusted machines may use the cached CLI session instead.
+In local AI apps, the macOS MCP helper should already have a scoped token created by the ReportKit macOS app. In hosted agents, `REPORTKIT_AGENT_TOKEN` should already be available through the secret environment. Local trusted machines may use the cached CLI session only when the MCP helper is unavailable or the automation explicitly chose the CLI path.
 
-## Send Command
+## Send Method
 
-Prefer:
+Prefer local MCP when available:
+
+```text
+reportkit_send
+```
+
+Pass the same JSON payload shape shown below as the tool arguments. The helper is stdio-only, defaults `apnsEnv` to `production`, generates deterministic idempotency keys when omitted, and cannot read files, run shell commands, listen on localhost, schedule jobs, or read the macOS app's normal Supabase refresh session.
+
+For hosted/cloud/CI runtimes without MCP, write the payload to a file and run:
 
 ```bash
 reportkit send --file payload.json
@@ -176,20 +185,21 @@ If the automation's current state is not actionable, prefer no send. Examples:
 - the report lacks the minimum fields needed for a useful Live Activity
 - a multi-surface send is requested but the payload lacks the required `widget` or `notification` object
 
-If skipping, return a concise reason and do not call `reportkit`.
+If skipping, return a concise reason and do not call `reportkit_send` or `reportkit`.
 
 ## Error Handling
 
 Do not hide delivery failures.
 
-- Missing `reportkit`: report that the CLI is not installed in this runtime.
-- Missing auth/token: report that the runtime lacks a local session or `REPORTKIT_AGENT_TOKEN`.
+- Missing `reportkit_send`: report that the local MCP helper is not configured or unavailable, then use the CLI fallback only if the automation explicitly allows it.
+- Missing `reportkit`: on the hosted CLI path, report that the CLI is not installed in this runtime.
+- Missing auth/token: report that the runtime lacks a local MCP token, local CLI session, or `REPORTKIT_AGENT_TOKEN`, depending on the selected send method.
 - `live_activity_daily_limit_reached` or HTTP 402: report the daily send limit/paywall state.
 - No registered targets: report that the iPhone app likely has not signed in/uploaded tokens.
 - Blank or partial Live Activity risk: check that `template` and filled payload fields are present.
 - Widget refresh rejected: check that `surfaces` includes `widget` and the payload includes `widget.widgetId` plus `widget.snapshot`.
 - Notification rejected: check that `surfaces` includes `notification` and the payload includes `notification.title`, `notification.body`, and optional `notification.threadId`.
-- Control Widget did not flip: check that the send used the current CLI, generated a fresh `idempotencyKey`, and included `notification.control.isOn`.
+- Control Widget did not flip: check that the send used the current MCP helper or CLI, generated a fresh `idempotencyKey`, and included `notification.control.isOn`.
 
 ## Response Style
 

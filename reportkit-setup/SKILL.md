@@ -22,7 +22,7 @@ Create an automation that knows:
 - how notifications should group, using `notification.threadId`
 - whether notifications should also update the Control Widget state
 - where the action or deep link should open
-- how the runtime agent will access `REPORTKIT_AGENT_TOKEN`
+- how the runtime agent will publish: local macOS MCP helper or hosted `REPORTKIT_AGENT_TOKEN`
 
 ReportKit is not the scheduler. Scheduling belongs to Codex, Claude, Cursor, CI, cron, launchd, or the user's workflow runner.
 
@@ -30,24 +30,41 @@ ReportKit is not the scheduler. Scheduling belongs to Codex, Claude, Cursor, CI,
 
 For the hosted beta:
 
-1. Install the CLI with `npm install -g @andreasink/reportkit`.
-2. Install and open the ReportKit iPhone app.
-3. Sign into the iPhone app and CLI with the same email/password account.
-4. Run `reportkit auth --email <email>` locally.
-5. Run `reportkit status`.
+1. Install and open the ReportKit iPhone app.
+2. Install and open the ReportKit macOS app.
+3. Sign into the iPhone and macOS apps with the same email/password account.
+4. In the macOS app, click **Enable MCP** to create the scoped ReportKit MCP token.
+5. Click **Copy Config** and paste the MCP config into Codex, Claude, Cursor, or another local MCP-compatible client.
 6. Confirm iPhone notifications are allowed.
 
-The hosted beta CLI already includes the public Supabase URL and publishable key. Ask for `REPORTKIT_SUPABASE_URL` and `REPORTKIT_SUPABASE_ANON_KEY` only when the user is self-hosting or targeting another ReportKit-compatible backend.
+The local MCP helper command is:
 
-Never ask users to put passwords in command arguments. Use the interactive password prompt by default. For non-interactive auth only:
-
-```bash
-printf '%s\n' 'your-password' | reportkit auth --email you@example.com --password-stdin
+```text
+/Applications/ReportKit.app/Contents/Library/Helpers/ReportKitMCP
 ```
+
+The copied MCP config should look like:
+
+```json
+{
+  "mcpServers": {
+    "reportkit": {
+      "command": "/Applications/ReportKit.app/Contents/Library/Helpers/ReportKitMCP",
+      "args": []
+    }
+  }
+}
+```
+
+The hosted beta apps and helper already include the public Supabase URL and publishable key. Ask for `REPORTKIT_SUPABASE_URL` and `REPORTKIT_SUPABASE_ANON_KEY` only when the user is self-hosting or targeting another ReportKit-compatible backend.
+
+The MCP helper is stdio-only. It can publish ReportKit updates with the scoped token from the macOS app, but it cannot read repos or documents, run shell commands, listen on localhost, schedule jobs, or read the macOS app's normal Supabase refresh session.
+
+Only use the npm CLI path when the user's runtime cannot use local MCP, or when a hosted/cloud agent needs an environment secret.
 
 ## Cloud Agent Token
 
-For hosted or background agents, create a publish token on a trusted local machine:
+For hosted or background agents that cannot use the local macOS MCP helper, create a publish token on a trusted local machine. If using the npm CLI for this fallback path, sign in interactively first with `reportkit auth --email <email>`, then create the token:
 
 ```bash
 reportkit agent-token create --name "Codex Automation" --json
@@ -57,10 +74,11 @@ Store the returned `token` value as `REPORTKIT_AGENT_TOKEN` in the automation pr
 
 Rules:
 
+- Prefer the macOS MCP helper for local Codex, Claude, Cursor, and other local AI apps.
 - Do not copy local session files into cloud agents.
 - Do not paste `REPORTKIT_AGENT_TOKEN` into prompts, code, logs, README files, or shell history.
 - Do not use inline `REPORTKIT_AGENT_TOKEN=... reportkit ...` examples.
-- Runtime commands should start with `reportkit` so automation rules can match them.
+- Hosted CLI runtime commands should start with `reportkit` so automation rules can match them.
 - If a token appears in logs, prompts, commits, or shared transcripts, revoke it with `reportkit agent-token revoke --id TOKEN_ID`.
 
 ## Planning Questions
@@ -98,7 +116,7 @@ For `builder`, use file mode and include `builderSpec` plus `data` directly in t
 
 ## Surfaces
 
-Omit `surfaces` only for the legacy Live Activity-only default. For new automations, use `reportkit send --file payload.json` with explicit surfaces:
+Omit `surfaces` only for the legacy Live Activity-only default. For new automations, send an explicit JSON payload through local `reportkit_send` or hosted `reportkit send --file payload.json`:
 
 - `live_activity`: Dynamic Island / Lock Screen Live Activity update.
 - `widget`: Home Screen / Lock Screen WidgetKit refresh through a silent push. Include `widget.widgetId`, a small non-secret `widget.snapshot`, and `reload: true`.
@@ -129,10 +147,10 @@ End setup by writing the exact runtime instruction that the automation should fo
 
 - use `$reportkit-execution`
 - check the automation's skip conditions before sending
-- write a JSON payload file
-- run `reportkit send --file payload.json`
+- for local MCP, call `reportkit_send` with the JSON payload
+- for hosted/cloud CLI runtimes, write a JSON payload file and run `reportkit send --file payload.json`
 - keep deep links and `idempotencyKey` inside JSON
-- rely on `REPORTKIT_AGENT_TOKEN` from the secret environment when running in cloud
+- rely on the macOS helper's scoped token locally or `REPORTKIT_AGENT_TOKEN` from the secret environment when running in cloud
 
 Good runtime instruction shape:
 
@@ -141,7 +159,8 @@ When this automation finishes evaluating the current state, use $reportkit-execu
 If the skip condition is true, do not send.
 If sending, create a ReportKit JSON payload with activityId "release-watch",
 template "agent", status from the rules above, and a stable idempotencyKey for this run.
-Run reportkit send --file payload.json. Do not print REPORTKIT_AGENT_TOKEN.
+In local MCP clients, call `reportkit_send` with that JSON payload.
+In hosted CLI runtimes, run `reportkit send --file payload.json`. Do not print `REPORTKIT_AGENT_TOKEN`.
 ```
 
 Multi-surface runtime instruction shape:
@@ -150,14 +169,15 @@ Multi-surface runtime instruction shape:
 When this automation finishes evaluating the current state, use $reportkit-execution.
 If the skip condition is true, do not send.
 If sending, create a ReportKit JSON payload with surfaces ["live_activity", "widget", "notification"], activityId "release-watch", template "agent", status from the rules above, widget.widgetId "release-watch", notification.threadId "release-watch", and notification.control.isOn set true for warning/critical and false for resolved.
-Run reportkit send --file payload.json. Do not print REPORTKIT_AGENT_TOKEN.
+In local MCP clients, call `reportkit_send` with that JSON payload.
+In hosted CLI runtimes, run `reportkit send --file payload.json`. Do not print `REPORTKIT_AGENT_TOKEN`.
 ```
 
 ## Quotas And Failure UX
 
 Tell the user about limits in product terms:
 
-- `reportkit widget list` prints the server-side plan and quota, such as `Plan: Free (1/1 widgets)`.
+- The app surfaces plan and quota state; on the CLI fallback path, `reportkit widget list` prints the server-side plan and quota, such as `Plan: Free (1/1 widgets)`.
 - Free accounts get two Live Activity sends per UTC day.
 - Pro entitlement bypasses the daily Live Activity send limit.
 - Daily send limit responses use HTTP 402 with `live_activity_daily_limit_reached`; present that as an upgrade/paywall moment, not an auth failure.
