@@ -15,7 +15,7 @@ Do not redesign the automation here. Do not ask broad onboarding questions unles
 2. If the skip condition is true, do not send.
 3. If sending locally and `reportkit_send` is available, call that MCP tool with the JSON payload.
 4. If sending from hosted/cloud/CI without MCP, use a JSON payload file and `reportkit send --file payload.json`.
-5. Keep `deepLink`, `apnsEnv`, and `idempotencyKey` inside JSON.
+5. Keep `deepLink`, `apnsEnv`, update-mode fields, and `idempotencyKey` inside JSON.
 6. Do not print, echo, or inline `REPORTKIT_AGENT_TOKEN`.
 7. Do not run `REPORTKIT_AGENT_TOKEN=... reportkit ...`.
 8. Do not put passwords or Supabase keys into commands.
@@ -53,6 +53,7 @@ Use this shape:
 {
   "event": "update",
   "activityId": "release-watch",
+  "updateMode": "upsert_single",
   "apnsEnv": "production",
   "idempotencyKey": "release-watch-2026-05-15T18-00Z",
   "payload": {
@@ -101,12 +102,42 @@ Rules:
 
 - `generatedAt` is a Unix timestamp in seconds.
 - Use a stable `activityId` for repeated updates to the same Live Activity.
-- Use a stable `idempotencyKey` for the same run or event.
+- Use a stable `idempotencyKey` for the same run or event when the automation already has one; otherwise omit it and let the helper or CLI generate one.
+- Use `updateMode` to control Live Activity routing: `start_new`, `update_existing`, `upsert_single`, or `coalesce`.
+- Use `upsert_single` when the user wants one Live Activity per `activityId`.
+- Use `start_new` when each run should create a separate Live Activity.
+- Use `update_existing` when a missing Live Activity should not be restarted.
+- Use `coalesce` with a stable `coalesceKey` when several checks should combine into one activity without overwriting each other.
 - Use `event: "start"` for a new activity, `update` for current state, and `end` only when ending is intentional.
 - Set `template` explicitly even though the CLI has an `ops` fallback.
 - Use `status: "good"`, `"warning"`, or `"critical"`.
 - Use `apnsEnv: "production"` unless the automation is explicitly testing a sandbox/TestFlight path.
 - Omit `surfaces` only for the legacy Live Activity-only default.
+
+For coalesced sends, use this shape:
+
+```json
+{
+  "event": "update",
+  "activityId": "daily-health",
+  "updateMode": "coalesce",
+  "coalesceKey": "supabase",
+  "coalesceTTLSeconds": 3600,
+  "payload": {
+    "generatedAt": 1774000000,
+    "title": "Supabase Health",
+    "summary": "Auth and edge probes passed.",
+    "status": "good",
+    "template": "ops",
+    "sourceName": "Supabase"
+  },
+  "surfaces": ["live_activity"]
+}
+```
+
+`coalesceKey` identifies the check inside the combined Live Activity. Omit `coalesceTTLSeconds` unless stale checks should age out. If you set `idempotencyKey` manually for a coalesced send, include the source or check identity in the key; otherwise omit it and let the current helper or CLI generate a deterministic key that includes `coalesceKey`.
+
+Use camelCase in public JSON examples: `updateMode`, `coalesceKey`, and `coalesceTTLSeconds`. The helper and CLI also accept snake_case aliases for compatibility.
 
 ## Surface Rules
 

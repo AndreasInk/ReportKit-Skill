@@ -24,6 +24,15 @@ ReportKit sends can target multiple iPhone surfaces:
 - `notification`: grouped APNs alert notifications with `notification.threadId`.
 - Control Widget state updates through `notification.control`.
 
+Live Activity sends can also choose how updates are routed:
+
+- `start_new`: create a fresh Live Activity for every send.
+- `update_existing`: update an existing activity only; do not start a replacement when none is active.
+- `upsert_single`: keep one active Live Activity per `activityId`, updating it when possible and starting it when needed.
+- `coalesce`: combine multiple checks into one Live Activity by using a stable `activityId` plus a per-check `coalesceKey`.
+
+Use `upsert_single` when a user wants only one Live Activity for a report. Use `start_new` when each run should stand alone. Use `coalesce` when several checks should share one combined Live Activity without overwriting each other.
+
 ## Live Activity Examples
 
 Use this skill when you want an agent to send focused, action-oriented Live Activity updates instead of another chat notification.

@@ -19,6 +19,8 @@ Create an automation that knows:
 - how to map outcomes to `good`, `warning`, and `critical`
 - which ReportKit surfaces to send: `live_activity`, `widget`, `notification`
 - which Live Activity template to use when `live_activity` is included
+- which Live Activity update mode to use: `start_new`, `update_existing`, `upsert_single`, or `coalesce`
+- which stable `coalesceKey` identifies each check when coalescing
 - how notifications should group, using `notification.threadId`
 - whether notifications should also update the Control Widget state
 - where the action or deep link should open
@@ -92,12 +94,13 @@ Ask only what is needed, then produce concrete setup instructions.
 5. What maps to `good`, `warning`, and `critical`?
 6. When should the automation do nothing?
 7. Are there quiet hours, blackout windows, or people/projects to exclude?
-8. Should each report use a separate `activityId`, or should multiple checks group into one Live Activity?
-9. Which surfaces should this send to: Live Activity, Home/Lock widget, grouped notification, or Control Widget?
-10. If notifications are enabled, what stable `threadId` should group them in Notification Center?
-11. If the Control Widget is enabled, which states turn it on and which clear it?
-12. What should the action text say?
-13. What URL, app deep link, Craft doc, PR, dashboard, or run log should open?
+8. Should each report start a separate Live Activity, update one existing activity, upsert one activity per `activityId`, or coalesce several checks into one combined activity?
+9. If coalescing, what stable `coalesceKey` identifies each check or source?
+10. Which surfaces should this send to: Live Activity, Home/Lock widget, grouped notification, or Control Widget?
+11. If notifications are enabled, what stable `threadId` should group them in Notification Center?
+12. If the Control Widget is enabled, which states turn it on and which clear it?
+13. What should the action text say?
+14. What URL, app deep link, Craft doc, PR, dashboard, or run log should open?
 
 ## Template Choice
 
@@ -141,6 +144,19 @@ Control Widget state is carried on the notification payload:
 
 Use `control.isOn: true` for active warning/critical states and `false` for clear/resolved states. Treat the push payload as the Control Widget source of truth; do not require manual Control Center taps to correct automation state.
 
+## Live Activity Update Modes
+
+Choose one update mode when `live_activity` is included:
+
+- `start_new`: create a fresh Live Activity for every send. Use this when each report or run should stand alone.
+- `update_existing`: update an existing Live Activity for `activityId` only. Use this when a missing activity should be reported instead of restarted.
+- `upsert_single`: update the active activity for `activityId` when possible, otherwise start one. Use this when the user wants only one Live Activity for a report.
+- `coalesce`: combine several checks into one Live Activity. Use one stable `activityId` for the combined activity and a stable `coalesceKey` for each check, such as `supabase`, `app-store`, or `cloud-run`.
+
+Use camelCase in public JSON examples: `updateMode`, `coalesceKey`, and `coalesceTTLSeconds`. The helper and CLI also accept snake_case aliases for compatibility.
+
+For coalesced reports, include `coalesceTTLSeconds` only when stale checks should age out of the combined view. If the runtime sets `idempotencyKey` manually for coalesced sends, include the source or check identity in the key. If `idempotencyKey` is omitted, the current ReportKit helper and CLI generate a deterministic key that includes `coalesceKey`.
+
 ## Handoff To Runtime
 
 End setup by writing the exact runtime instruction that the automation should follow. Include:
@@ -149,7 +165,7 @@ End setup by writing the exact runtime instruction that the automation should fo
 - check the automation's skip conditions before sending
 - for local MCP, call `reportkit_send` with the JSON payload
 - for hosted/cloud CLI runtimes, write a JSON payload file and run `reportkit send --file payload.json`
-- keep deep links and `idempotencyKey` inside JSON
+- keep deep links, update-mode fields, and any explicit `idempotencyKey` inside JSON
 - rely on the macOS helper's scoped token locally or `REPORTKIT_AGENT_TOKEN` from the secret environment when running in cloud
 
 Good runtime instruction shape:
@@ -158,7 +174,7 @@ Good runtime instruction shape:
 When this automation finishes evaluating the current state, use $reportkit-execution.
 If the skip condition is true, do not send.
 If sending, create a ReportKit JSON payload with activityId "release-watch",
-template "agent", status from the rules above, and a stable idempotencyKey for this run.
+template "agent", updateMode "upsert_single", status from the rules above, and a stable idempotencyKey for this run.
 In local MCP clients, call `reportkit_send` with that JSON payload.
 In hosted CLI runtimes, run `reportkit send --file payload.json`. Do not print `REPORTKIT_AGENT_TOKEN`.
 ```
@@ -169,6 +185,17 @@ Multi-surface runtime instruction shape:
 When this automation finishes evaluating the current state, use $reportkit-execution.
 If the skip condition is true, do not send.
 If sending, create a ReportKit JSON payload with surfaces ["live_activity", "widget", "notification"], activityId "release-watch", template "agent", status from the rules above, widget.widgetId "release-watch", notification.threadId "release-watch", and notification.control.isOn set true for warning/critical and false for resolved.
+In local MCP clients, call `reportkit_send` with that JSON payload.
+In hosted CLI runtimes, run `reportkit send --file payload.json`. Do not print `REPORTKIT_AGENT_TOKEN`.
+```
+
+Coalesced runtime instruction shape:
+
+```text
+When this automation finishes evaluating the current state, use $reportkit-execution.
+If the skip condition is true, do not send.
+If sending, create a ReportKit JSON payload with activityId "daily-health", updateMode "coalesce", coalesceKey set to this check's stable source key, template "ops", status from the rules above, and coalesceTTLSeconds only if stale checks should expire from the combined activity.
+Omit idempotencyKey unless the automation already has a stable event key; if setting it manually, include the coalesceKey in the key.
 In local MCP clients, call `reportkit_send` with that JSON payload.
 In hosted CLI runtimes, run `reportkit send --file payload.json`. Do not print `REPORTKIT_AGENT_TOKEN`.
 ```
